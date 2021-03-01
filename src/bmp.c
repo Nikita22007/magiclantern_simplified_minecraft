@@ -29,15 +29,100 @@
 #include "font.h"
 #include <stdarg.h>
 #include "propvalues.h"
+#include "log-d678.h"
 
 //~ int bmp_enabled = 1;
 
+// Lookup tables for COLOR_* in bmp.h
+// Earlier Digic cams use indexed colours.
+//
+// I haven't compared the indexed to YUV colours, I
+// simply picked ones that looked right to me given the names.
+// TODO define a different map for different DIGIC versions,
+// there's a few variants, different YUV profiles and
+// different ways of handling transparency.  I only
+// tested on 200D.
+//
+// Usage finder:
+// grep -R -o -P "COLOR_GRAY\(.*?\)"|awk -F: '{print $NF}'|grep COLOR|sort|uniq
+uint32_t index2yuva[256] = {
+    0x007f7fff, // COLOR_EMPTY 0x00
+    0xff7f7f00, // COLOR_WHITE 0x01
+    0x007f7f00, // COLOR_BLACK 0x02
+    0x007f7f7f, // COLOR_TRANSPARENT_BLACK 0x03
+    0x0, // 0x04
+    0xb2ab0000, // COLOR_CYAN 0x05
+    0x952b1500, // COLOR_GREEN1 0x06
+    0xca554a00, // COLOR_GREEN2 0x07
+    0x4c54ff00, // COLOR_RED 0x08
+    0x80c77400, // COLOR_LIGHT_BLUE 0x09
+    0x0, // 0x0a
+    0x1dff6b00, // COLOR_BLUE 0x0b
+    0x2f65d000, // COLOR_DARK_RED 0x0c
+    0x0, // 0x0d
+    0x69d4ea00, // COLOR_MAGENTA 0x0e
+    0xe1009400, // COLOR_YELLOW 0x0f
+    0x0, 0x0, 0x0, // 0x10 - 0x12
+    0x972ac900, // COLOR_ORANGE 0x13
+    0x7f80807f, // COLOR_TRANSPARENT_GRAY 0x14
+    0x70402f00, // COLOR_DARK_GREEN1_MOD 0x15
+    0x8b554a00, // COLOR_DARK_GREEN2_MOD 0x16
+    0x763dbf00, // COLOR_DARK_ORANGE_MOD 0x17
+    0xb6a02000, // COLOR_DARK_CYAN1_MOD 0x18
+    0x649b3800, // COLOR_DARK_CYAN2_MOD 0x19
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // 0x1a - 0x20
+    0x0, 0x0, 0x0, 0x0, 0x0, // 0x21 - 0x25
+    0x06808000, // COLOR_ALMOST_BLACK 0x26
+    //#define COLOR_GRAY(percent) (0x26 + (percent) * 41 / 100)
+        // e.g. COLOR_GRAY(50) is 50% gray
+    // 40 or 0x28 intermediate values between almost_black and almost_white
+    0x0c808000,
+    0x12808000,
+    0x18808000,
+    0x1e808000,
+    0x29808000,
+    0x2f808000,
+    0x35808000,
+    0x3a808000,
+    0x40808000,
+    0x46808000,
+    0x4c808000,
+    0x51808000,
+    0x57808000,
+    0x5d808000,
+    0x63808000,
+    0x69808000,
+    0x6e808000,
+    0x74808000,
+    0x7a808000,
+    0x80808000,
+    0x86808000,
+    0x8b808000,
+    0x91808000,
+    0x97808000,
+    0x9d808000,
+    0xa3808000,
+    0xa8808000,
+    0xae808000,
+    0xb4808000,
+    0xba808000,
+    0xc0808000,
+    0xc5808000,
+    0xcb808000,
+    0xd1808000,
+    0xd7808000,
+    0xdd808000,
+    0xe2808000,
+    0xe8808000,
+    0xee808000,
+    0xf4808000,
+    0xfa808000, // COLOR_ALMOST_WHITE 0x4F
+    0x0 // and one for luck
+};
+
 #ifdef CONFIG_VXWORKS
-
     // inline functions in bmp.h
-
 #else // DryOS
-
     // BMP_VRAM_START and BMP_VRAM_START are not generic - they only work on BMP buffer addresses returned by Canon firmware
     uint8_t* BMP_VRAM_START(uint8_t* bmp_buf)
     {
@@ -61,11 +146,23 @@
             
         if (((uintptr_t)bmp_buf & 0xFFF) == 0x4c0) // SD 700D
             return (uint8_t*)((uintptr_t)bmp_buf - BMP_HDMI_OFFSET - 0x3c0);
-        
+
         if (((uintptr_t)bmp_buf & 0xFFF) == 0xc28) // 100D
             return (uint8_t*)((uintptr_t)bmp_buf - BMP_HDMI_OFFSET - 0xb28);
 
+        // don't know the difference between these two yet
+        if (((uintptr_t)bmp_buf & 0xFFF) == 0x800) // 200D
+            return (uint8_t*)((uintptr_t)bmp_buf - BMP_HDMI_OFFSET - 0xb28);
+        if (((uintptr_t)bmp_buf & 0xFFF) == 0xb00) // 200D
+            return (uint8_t*)((uintptr_t)bmp_buf - BMP_HDMI_OFFSET - 0xb28);
+
         // something else - new camera? return it unchanged (failsafe)
+        log_start();
+        DryosDebugMsg(0, 15, "SJE new bmp_buf pattern: 0x%x\n",
+                      (uintptr_t)bmp_buf & 0xfff);
+        log_finish();
+        call("dumpf");
+        info_led_blink(9, 100, 100);
         ASSERT(0);
         return bmp_buf;
     }
@@ -78,7 +175,7 @@
     /** Returns a pointer to idle BMP vram */
     uint8_t* bmp_vram_idle()
     {
-    #if defined(CONFIG_1100D) || defined(CONFIG_100D) // This fixes "dirty" LCD output for 100D
+    #ifdef CONFIG_1100D
         return (uint8_t *)((((uintptr_t)bmp_vram_real() + 0x80000) ^ 0x80000) - 0x80000);
     #else
         return (uint8_t *)((uintptr_t)bmp_vram_real() ^ 0x80000);
@@ -141,33 +238,88 @@ void bmp_idle_copy(int direction, int fullsize)
     }
 }
 
-inline void bmp_putpixel_fast(uint8_t * const bvram, int x, int y, uint8_t color)
+inline void bmp_putpixel_fast(uint8_t * const bvram, int x, int y,
+                              uint8_t color)
 {
     #ifdef CONFIG_VXWORKS
     char* p = (char*)&bvram[(x)/2 + (y)/2 * BMPPITCH];
     SET_4BIT_PIXEL(p, x, color);
-    #else
+    #else // !CONFIG_VXWORKS
+
+    #if defined(CONFIG_DIGIC_VI) || \
+        defined(CONFIG_DIGIC_VII) || \
+        defined(CONFIG_DIGIC_VIII)
+        // then display is YUV of some kind, we must map the indexed
+        // 8-bit color to an equivalent value
+
+    struct marv *marv = bmp_marv();
+
+    uint32_t yuva = index2yuva[color];
+    // If the following looks backwards, recall
+    // the write to memory is little-endian.
+    // Personally I'd prefer the variable naming convention
+    // to be the other way round, so bit shifts are intuitive.
+    uint32_t uyvy = ((yuva << 0) & 0xff000000) |
+                    ((yuva << 8) & 0x00ff0000) |
+                    ((yuva >> 16) & 0x0000ff00) |
+                    ((yuva >> 16) & 0x000000ff);
+    uint8_t alpha = yuva & 0xff;
+
+    if (marv->opacity_data)
+    {
+        /* 80D, 200D */
+        /* adapted from names_are_hard, https://pastebin.com/Vt84t4z1 */
+        uint32_t * offset = (uint32_t *) &bvram[(x & ~1) * 2 + y * 2 * marv->width];
+        if (x % 2) {
+            // set U, Y2, V, keep Y1
+            *offset = (*offset & 0x0000FF00) | (uyvy & 0xFFFF00FF);
+        } else {
+            // set U, Y1, V, keep Y2
+            *offset = (*offset & 0xFF000000) | (uyvy & 0x00FFFFFF);
+        }
+        marv->opacity_data[x + y * marv->width] = alpha;
+    }
+    else
+    {
+        /* 5D4, M50 */
+        /* adapted from https://bitbucket.org/chris_miller/ml-fork/src/d1f1cdf978acc06c6fd558221962c827a7dc28f8/src/minimal-d678.c?fileviewer=file-view-default#minimal-d678.c-175 */
+        // VRAM layout is UYVYAA (each character is one byte) for pixel pairs
+        uint32_t * offset = (uint32_t *) &bvram[(x & ~1) * 3 + y * 3 * marv->width];   /* unaligned pointer */
+        if (x % 2) {
+            // set U, Y2, V, keep Y1
+            *offset = (*offset & 0x0000FF00) | (uyvy & 0xFFFF00FF);
+        } else {
+            // set U, Y1, V, keep Y2
+            *offset = (*offset & 0xFF000000) | (uyvy & 0x00FFFFFF);
+        }
+        uint8_t * opacity = (uint8_t *) offset + 4 + x % 2;
+        *opacity = alpha;
+    }
+
+    #else // DIGIC > 5
+
     bvram[x + y * BMPPITCH] = color;
     #endif
+    #endif // !CONFIG_VXWORKS
 
-     #ifdef CONFIG_500D // err70?!
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-     #endif
+    #ifdef CONFIG_500D // err70?!
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+       asm("nop");
+    #endif
 }
 
 
@@ -186,10 +338,18 @@ bmp_puts(
     *x = COERCE(*x, BMP_W_MINUS, BMP_W_PLUS);
     *y = COERCE(*y, BMP_H_MINUS, BMP_H_PLUS);
     
-    uint32_t    fg_color    = fontspec_fg( fontspec );
-    uint32_t    bg_color    = fontspec_bg( fontspec );
+    uint32_t fg_color = fontspec_fg(fontspec);
+    uint32_t bg_color = fontspec_bg(fontspec);
+
+    // Special case -- fg=bg=0 => white on black
+    if(fg_color == 0 && bg_color == 0)
+    {
+        fg_color = COLOR_WHITE;
+        bg_color = COLOR_BLACK;
+    }
     
-    int len = rbf_draw_string((void*)font_dynamic[FONT_ID(fontspec)].bitmap, *x, *y, s, FONT(fontspec, fg_color, bg_color));
+    int len = rbf_draw_string((void*)font_dynamic[FONT_ID(fontspec)].bitmap,
+                              *x, *y, s, FONT(fontspec, fg_color, bg_color));
     *x += len;
     return len;
 }
@@ -250,15 +410,15 @@ bmp_printf(
            ...
            )
 {
-    va_list            ap;
+    va_list ap;
 
     char bmp_printf_buf[128];
+    
+    va_start(ap, fmt);
+    vsnprintf(bmp_printf_buf, sizeof(bmp_printf_buf)-1, fmt, ap);
+    va_end(ap);
 
-    va_start( ap, fmt );
-    vsnprintf( bmp_printf_buf, sizeof(bmp_printf_buf)-1, fmt, ap );
-    va_end( ap );
-
-    return bmp_puts( fontspec, &x, &y, bmp_printf_buf );
+    return bmp_puts(fontspec, &x, &y, bmp_printf_buf);
 }
 
 // for very large strings only
@@ -273,7 +433,7 @@ big_bmp_printf(
 {
     int ans = 0;
     BMP_LOCK(
-        va_list            ap;
+        va_list ap;
 
         static char bmp_printf_buf[1024];
 
@@ -922,14 +1082,20 @@ static int bfnt_ok()
     int* codes = (int*) BFNT_CHAR_CODES;
     int i;
 
+    if (BFNT_CHAR_CODES == 0)
+        return 0;
+
     for (i = 0; i < 20; i++)
-        if (codes[i] != 0x20+i) return 0;
+        if (codes[i] != 0x20+i)
+            return 0;
 
     int* off = (int*) BFNT_BITMAP_OFFSET;
-    if (off[0] != 0) return 0;
+    if (off[0] != 0)
+        return 0;
 
     for (i = 1; i < 20; i++)
-        if (off[i] <= off[i-1]) return 0;
+        if (off[i] <= off[i-1])
+            return 0;
 
     return 1;
 }
@@ -993,10 +1159,7 @@ int bfnt_draw_char(int c, int px, int py, int fg, int bg)
     if (crw+xo > 100) return 0;
     if (ch+yo > 50) return 0;
 
-    if (bg != NO_BG_ERASE)
-    {
-        bmp_fill(bg, px, py, crw+xo+3, 40);
-    }
+    //~ bmp_fill(bg, px, py, crw+xo+3, 40);
 
     int i,j,k;
     for (i = 0; i < ch; i++)
@@ -1025,7 +1188,10 @@ int bfnt_char_get_width(int c)
 {
     if (!bfnt_ok())
     {
-        bmp_printf(FONT_SMALL, 0, 0, "font addr bad");
+        // FIXME SJE bmp_printf doesn't work yet on 200D
+        // maybe erroring before FONT_SMALL is defined?
+        if (BFNT_CHAR_CODES != 0)
+            bmp_printf(FONT_SMALL, 0, 0, "font addr bad");
         return 0;
     }
 

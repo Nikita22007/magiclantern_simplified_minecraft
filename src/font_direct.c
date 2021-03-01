@@ -143,3 +143,31 @@ void font_draw(uint32_t x_pos, uint32_t y_pos, uint32_t color, uint32_t scale, c
         }
     }
 }
+
+void font_drawf(uint32_t *buf,uint32_t x_pos, uint32_t y_pos, uint32_t color, uint32_t scale, char *text,uint32_t height,uint32_t width)
+{
+    uint32_t length = strlen(text);
+    
+    for(uint32_t i = 0; i < length; i++)
+    {
+        uint32_t ix = text[i] - 0x20;
+
+        if (ix > 127)
+        {
+            continue;
+        }
+        for(uint32_t y = 0; y < FONTH * scale; y++)
+        {
+            for(uint32_t x = 0; x < FONTW * scale; x++)
+            {
+                if(fontImg[ix][y/scale] & (1<<(x/scale)))
+                {
+                    //font_put_pixel(x_pos + i * (FONTW*scale) + x, y_pos + y, color);
+					//make sure to actually allocate width*height*4 bytes
+					buf[width * (x_pos + i * (FONTW*scale) + x) + (y_pos + y)] = color;  
+					
+                }
+            }
+        }
+    }
+}

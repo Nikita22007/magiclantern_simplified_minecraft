@@ -19,8 +19,8 @@ CFLAG_USER = -mthumb -march=armv7-a -mlong-calls
 # these should be removed when porting starts
 ifeq ($(ML_SRC_PROFILE),generic)
 ML_SRC_PROFILE  = minimal
-ML_MINIMAL_OBJ  = minimal-d678.o
-ML_SRC_EXTRA_OBJS += log-d678.o stdio.o function_overrides.o
+ML_MINIMAL_OBJ  = minimal-d678.o customscreen.o ../../src/avrcraft/demo_legacy_sock_dumbcraft/avrcraft.o ../../src/avrcraft/demo_legacy_sock_dumbcraft/dumbgame.o  ../../src/avrcraft/dumbcraft/dumbcraft.o ../../src/avrcraft/dumbcraft/dumbutils.o ../../src/avrcraft/libs/util10.o
+ML_SRC_EXTRA_OBJS += log-d678.o stdio.o function_overrides.o 
 endif
 
 ML_BOOT_OBJ     = boot-d78.o

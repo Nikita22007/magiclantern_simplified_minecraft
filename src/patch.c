@@ -11,9 +11,9 @@
 #undef PATCH_DEBUG
 
 #ifdef PATCH_DEBUG
-#define dbg_printf(fmt,...) { printf(fmt, ## __VA_ARGS__); }
+#define uart_printf(fmt,...) { printf(fmt, ## __VA_ARGS__); }
 #else
-#define dbg_printf(fmt,...) {}
+#define uart_printf(fmt,...) {}
 #endif
 
 #define MAX_PATCHES 32
@@ -132,12 +132,12 @@ int _patch_sync_caches(int also_data)
 
     if (also_data)
     {
-        dbg_printf("Syncing caches...\n");
+        uart_printf("Syncing caches...\n");
         _sync_caches();
     }
     else
     {
-        dbg_printf("Flushing ICache...\n");
+        uart_printf("Flushing ICache...\n");
         _flush_i_cache();
     }
     
@@ -170,7 +170,7 @@ static uint32_t read_value(uint32_t* addr, int is_instruction)
         && cache_is_patchable((uint32_t)addr, TYPE_ICACHE, &cached_value) == 2)
     {
         /* return the value patched in the instruction cache */
-        dbg_printf("Read from ICache: %x -> %x\n", addr, cached_value);
+        uart_printf("Read from ICache: %x -> %x\n", addr, cached_value);
         return cached_value;
     }
 
@@ -182,7 +182,7 @@ static uint32_t read_value(uint32_t* addr, int is_instruction)
 
     if (IS_ROM_PTR(addr))
     {
-        dbg_printf("Read from ROM: %x -> %x\n", addr, MEM(addr));
+        uart_printf("Read from ROM: %x -> %x\n", addr, MEM(addr));
     }
 
 #ifdef CONFIG_QEMU
@@ -202,7 +202,7 @@ read_from_ram:
 
 static int do_patch(uint32_t* addr, uint32_t value, int is_instruction)
 {
-    dbg_printf("Patching %x from %x to %x\n", addr, read_value(addr, is_instruction), value);
+    uart_printf("Patching %x from %x to %x\n", addr, read_value(addr, is_instruction), value);
 
 #ifdef CONFIG_QEMU
     goto write_to_ram;
@@ -308,7 +308,7 @@ static int patch_memory_work(
     /* ensure thread safety */
     uint32_t old_int = cli();
 
-    dbg_printf("patch_memory_work(%x)\n", addr);
+    uart_printf("patch_memory_work(%x)\n", addr);
 
     /* is this address already patched? refuse to patch it twice */
     for (int i = 0; i < num_patches; i++)
@@ -384,7 +384,7 @@ static int reapply_cache_patch(int p)
     if (current != patched)
     {
         void* addr = patches[p].addr;
-        dbg_printf("Re-applying %x -> %x (changed to %x)\n", addr, patched, current);
+        uart_printf("Re-applying %x -> %x (changed to %x)\n", addr, patched, current);
         cache_fake((uint32_t) addr, patched, patches[p].is_instruction ? TYPE_ICACHE : TYPE_DCACHE);
 
         /* did it actually work? */
@@ -459,7 +459,7 @@ int unpatch_memory(uintptr_t _addr)
     int err = E_UNPATCH_OK;
     uint32_t old_int = cli();
 
-    dbg_printf("unpatch_memory(%x)\n", addr);
+    uart_printf("unpatch_memory(%x)\n", addr);
 
     /* find the patch in our data structure */
     int p = -1;
@@ -633,7 +633,7 @@ static uint32_t get_matrix_patch_backup_value(struct matrix_patch * p, int row_i
 
 static void set_matrix_patch_backup_value(struct matrix_patch * p, int row_index, int col_index, uint32_t value)
 {
-    dbg_printf("Backup %x[%d][%d] = %x\n", p->addr, row_index, col_index, value);
+    uart_printf("Backup %x[%d][%d] = %x\n", p->addr, row_index, col_index, value);
     int linear_index = COERCE(row_index * p->num_columns + col_index, 0, p->num_rows * p->num_columns - 1);
     p->backups[linear_index] = value;
 }
@@ -648,7 +648,7 @@ static uint32_t get_matrix_patch_new_value(struct matrix_patch * p, int row_inde
     {
         uint32_t old = get_matrix_patch_backup_value(p, row_index, col_index, MASKED);
         uint32_t new = (uint64_t) old * (uint64_t) p->patch_scaling / (uint64_t) 0x10000 + p->patch_offset;
-        dbg_printf("Scaling %x[%x][%x] from %x to %x f=0x%x/0x10000\n", p->addr, row_index, col_index, old, new & p->patch_mask, p->patch_scaling);
+        uart_printf("Scaling %x[%x][%x] from %x to %x f=0x%x/0x10000\n", p->addr, row_index, col_index, old, new & p->patch_mask, p->patch_scaling);
         return new & p->patch_mask;
     }
 }

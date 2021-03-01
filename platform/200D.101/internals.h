@@ -4,3 +4,4 @@
 
 /** This camera has a DIGIC VII chip */
 #define CONFIG_DIGIC_VII
+
