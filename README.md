@@ -1,5 +1,6 @@
 Magic Lantern
 =============
+THIS IS A DRAFT(BODGE), I DONT RECCOMEND RUNNING THIS WITHOUT KNOWING WHAT YOU'RE DOING. 
 
 Magic Lantern (ML) is a software enhancement that offers increased
 functionality to the excellent Canon DSLR cameras.
