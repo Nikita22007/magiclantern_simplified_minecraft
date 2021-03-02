@@ -1,6 +1,17 @@
+This is a modified copy of magiclantern_simplified to run a minecraft server using avrcraft on the 200D **only**.
+THIS IS A DRAFT(BODGE), I DONT RECCOMEND RUNNING THIS WITHOUT KNOWING WHAT YOU'RE DOING AS THIS COULD DESTORY YOUR CAMERA. I AM NOT RESPONSILBE IF YOU ATTEMPT THIS AND YOUR CAMERA BREAKS, TRY THIS AT YOUR OWN RISK.
+If you still want to run this, make sure you have a linux machine. (I used ubuntu) and have arm-none-eabi-gcc compiler installed along with make and then run the following commmands
+```
+git clone https://github.com/turtiustrek/magiclantern_simplified/
+cd magiclantern_simplified/platform/200D.101
+make
+```
+
+Attributions:
+https://github.com/cnlohr/avrcraft - for avrcraft
+
 Magic Lantern
 =============
-THIS IS A DRAFT(BODGE), I DONT RECCOMEND RUNNING THIS WITHOUT KNOWING WHAT YOU'RE DOING. 
 
 Magic Lantern (ML) is a software enhancement that offers increased
 functionality to the excellent Canon DSLR cameras.
