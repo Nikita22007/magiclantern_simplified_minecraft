@@ -10,6 +10,9 @@ make
 Attributions:
 https://github.com/cnlohr/avrcraft - for avrcraft
 
+[![demo](http://img.youtube.com/vi/lbq3LO0KYrk/0.jpg)](http://www.youtube.com/watch?v=lbq3LO0KYrk "youtube video")
+
+
 Magic Lantern
 =============
 
