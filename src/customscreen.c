@@ -1,10 +1,10 @@
 
-//THIS FILE IS A BODGE, MANY CRAPPY PRACTISES WERE DONE. 
+//THIS FILE IS A BODGE, MANY CRAPPY PRACTISES WERE DONE.
 //Not too sure on how to update the display reliably
 
 #include "dryos.h"
 #include "bmp.h"
-#define MAXLINES 10
+#define MAXLINES 8
 extern void uart_printf(const char *fmt, ...);
 
 extern void font_draw(uint32_t, uint32_t, uint32_t, uint32_t, char *);
@@ -12,7 +12,7 @@ extern void font_draw(uint32_t, uint32_t, uint32_t, uint32_t, char *);
 static int beforePosition;
 static int currentPosition;
 
-static int stack[MAXLINES+1];
+static int stack[MAXLINES + 1];
 static int top = -1;
 
 static int isempty()
@@ -90,7 +90,7 @@ static struct stringqueue
 {
     uint8_t msg[128];
 } display[100];
- int bmp_printf_auto(const char *fmt, ...)
+int bmp_printf_auto(const char *fmt, ...)
 {
     va_list ap;
 
@@ -102,50 +102,54 @@ static struct stringqueue
     //int xx = x;
     //int yy = y;
     //font_drawf(vrambuffer, x, y, 0xff000000, 3, bmp_printf_buf, (marv->height), (marv->width));
-     currentPosition++;
+    currentPosition++;
     if (currentPosition > MAXLINES)
     {
         int pops = pop();
-        uart_printf("Popped! (%x) %s",pops,display[pops].msg);
+        uart_printf("Popped! (%x) %s", pops, display[pops].msg);
         currentPosition = pops;
     }
     strcpy(display[currentPosition].msg, bmp_printf_buf);
-    uart_printf("Pusing %s to stack index: %d\n", bmp_printf_buf, currentPosition);
+    uart_printf("Pushing %s to stack index: %d\n", bmp_printf_buf, currentPosition);
     insertAtBottom(currentPosition);
-  
+
     beforePosition = currentPosition;
-           
 
     return 0;
 }
 
 static int x = 0;
 static int y = 0;
- void screen()
+void screen()
 {
+    while (!bmp_vram_raw())
+    {
+        msleep(100);
+    }
 
     while (1)
     {
-      
-        y = 0;
-        int prev;
-        //this refreshes the display. bodge.
-        ((void (*)(int param_1, int x, int y, int w, int h))0xE04AFF41)(0, 0, 0, 10, 10);
-        for (int index = currentPosition; index >= 0; index--)
+        if (MEM(0xfd94) != 0)
         {
 
-            if (prev == peek(index))
+            y = 0;
+            int prev;
+            //this refreshes the display. bodge.
+            ((void (*)(int param_1, int x, int y, int w, int h))0xE04AFF41)(0, 0, 0, 10, 10);
+            for (int index = currentPosition; index >= 0; index--)
             {
-                continue;
-            }
-             //yes this draws pixel by pixel. good enough for PoC?
-            font_draw(x, y, 0xFFFFFF80, 2, display[peek(index)].msg);
-            y += 30;
 
-            prev = peek(index);
+                if (prev == peek(index))
+                {
+                    continue;
+                }
+                //yes this draws pixel by pixel. good enough for PoC?
+                font_draw(x, y, 0xFFFFFFF0, 3, display[peek(index)].msg);
+                y += 30;
+
+                prev = peek(index);
+            }
         }
-        msleep(100);
-        
-        //;
+        msleep(10);
     }
 }

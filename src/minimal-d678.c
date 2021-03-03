@@ -2,7 +2,7 @@
  * Minimal test code for DIGIC 6
  * ROM dumper & other experiments but this is a minecraft server 
  */
-#if  !defined(CONFIG_200D)
+#if !defined(CONFIG_200D)
 #error "This is only for the 200D at version 1.0.1"
 #endif
 #include "dryos.h"
@@ -19,15 +19,14 @@ extern void font_drawf(uint32_t *buf, uint32_t x_pos, uint32_t y_pos, uint32_t c
 extern uint32_t _AllocateMemory(uint32_t size);
 extern void _FreeMemory(void *);
 
-
 extern int wlanconnect(void *);
 
 //#define SSID "turtius"
-//#define PASSPHRASE "rocks@123"    
-//#define STATICIP "192.168.10.22" //IP for the camera. 
+//#define PASSPHRASE "rocks@123"
+//#define STATICIP "192.168.10.22" //IP for the camera.
 
-#if !defined SSID ||  !defined PASSPHRASE ||  !defined STATICIP
-#  error "Wifi stuff not specified"
+#if !defined SSID || !defined PASSPHRASE || !defined STATICIP
+#error "Wifi stuff not specified"
 #endif
 struct
 {
@@ -42,8 +41,6 @@ struct
     int h;
     char pass[0x3f];
 } * wifisettings;
-
-
 
 struct marv
 {
@@ -95,10 +92,11 @@ void disp_set_pixel(uint32_t x, uint32_t y, uint32_t color)
 
     // UYVY display, must convert
     //uint32_t color = 0xFFFFFFFF;
-    uint32_t uyvy = rgb2yuv422(color >> 24,
-                               (color >> 16) & 0xff,
-                               (color >> 8) & 0xff);
-    uint8_t alpha = color & 0xff;
+    //uint32_t uyvy = rgb2yuv422(color >> 24,
+    //                           (color >> 16) & 0xff,
+      //                         (color >> 8) & 0xff);
+      uint32_t uyvy = 0x9515952b;
+    uint8_t alpha =  0xff;
 
     if (marv->opacity_data)
     {
@@ -190,32 +188,38 @@ void hexDump(char *desc, void *addr, int len)
     uart_printf("  %s\n", buff);
 }
 
-
 static void DUMP_ASM my_DebugMsg(int class, int level, char *fmt, ...)
 {
     int lr = read_lr();
-    char buf[1000];
-    int len;
-    va_list ap;
-    va_start(ap, fmt);
-    len += vsnprintf(buf + len, 1000 - len - 1, fmt, ap);
-    va_end(ap);
-    len += snprintf(buf + len, 1000 - len, "LR: %x", lr);
-    len += snprintf(buf + len, 1000 - len, "\n");
-    uart_printf("%s", buf);
+    if (class == 0x82)
+    {
+        char buf[1000];
+        int len;
+        va_list ap;
+        va_start(ap, fmt);
+        len += vsnprintf(buf + len, 1000 - len - 1, fmt, ap);
+        va_end(ap);
+        len += snprintf(buf + len, 1000 - len, " LR: %x", lr);
+        len += snprintf(buf + len, 1000 - len, "\n");
+        uart_printf("%s", buf);
+    }
+    else
+    {
+        return;
+    }
 }
 
 static void DUMP_ASM server()
 {
-
 
     //wait for screen to turn on before doing anything
     while (!bmp_vram_raw())
     {
         msleep(100);
     }
-  MEM(0xfd94) = 1;
+
     msleep(1000);
+
     bmp_printf_auto("Switching WIFI on...\n");
     msleep(1000);
     bmp_printf_auto("Waiting for response\n");
